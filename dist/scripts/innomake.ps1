@@ -9,6 +9,9 @@ if ($arch -eq 'x86') {
     $iss_args += '/dMyArch=x86'
 } elseif ($arch -eq 'arm64') {
     $iss_args += '/dMyArch=arm64'
+} else {
+    # MyArch must be defined for every arch: qView.iss compares its value
+    $iss_args += '/dMyArch=x64'
 }
 
 iscc.exe $iss_args "dist\win\qView.iss"
