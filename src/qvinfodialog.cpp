@@ -1,12 +1,60 @@
 #include "qvinfodialog.h"
 #include "ui_qvinfodialog.h"
 #include <QDateTime>
+#include <QFile>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QMimeDatabase>
 #include <QTimer>
+#include <QtEndian>
 
 static int getGcd(int a, int b)
 {
     return (b == 0) ? a : getGcd(b, a % b);
+}
+
+// VRCMetadata/VRCX store the session as JSON in the PNG's iTXt "Description" chunk.
+// QImageReader would decode the whole image to hand that over, so walk the chunk list
+// instead: the text chunks always precede IDAT.
+static QByteArray pngDescription(const QString &path)
+{
+    static const char pngSignature[8] = { static_cast<char>(0x89), 'P', 'N', 'G', 13, 10, 26, 10 };
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly) || file.read(8) != QByteArray(pngSignature, 8))
+        return QByteArray();
+
+    while (file.pos() < 1024 * 1024) {
+        const QByteArray header = file.read(8);
+        if (header.size() < 8)
+            break;
+        const quint32 length = qFromBigEndian<quint32>(header.constData());
+        const QByteArray type = header.mid(4, 4);
+        if (type == "IDAT" || type == "IEND" || length > 16384)
+            break;
+        QByteArray data = file.read(length);
+        file.skip(4); // CRC
+        if (data.size() < int(length))
+            break;
+
+        const int keywordEnd = data.indexOf('\0');
+        if (keywordEnd < 0 || data.left(keywordEnd) != QByteArrayLiteral("Description"))
+            continue;
+
+        if (type == "iTXt") {
+            // keyword NUL, compression flag, method, language NUL, translated keyword NUL, text
+            int pos = data.indexOf('\0', keywordEnd + 3);
+            if (pos < 0)
+                continue;
+            pos = data.indexOf('\0', pos + 1);
+            if (pos < 0)
+                continue;
+            return data.mid(pos + 1);
+        }
+        if (type == "tEXt")
+            return data.mid(keywordEnd + 1);
+    }
+    return QByteArray();
 }
 
 QVInfoDialog::QVInfoDialog(QWidget *parent) : QDialog(parent), ui(new Ui::QVInfoDialog)
@@ -81,5 +129,48 @@ void QVInfoDialog::updateInfo()
         ui->framesLabel2->hide();
         ui->framesLabel->hide();
     }
+
+    // VRChat session metadata, if this file carries any: each row hides itself when empty.
+    const QJsonObject session =
+            QJsonDocument::fromJson(pngDescription(selectedFileInfo.absoluteFilePath())).object();
+    const QJsonObject author = session.value("author").toObject();
+    const QJsonObject world = session.value("world").toObject();
+
+    QStringList players;
+    const QJsonArray playerArray = session.value("players").toArray();
+    for (const QJsonValue &player : playerArray)
+        players.append(player.toObject().value("displayName").toString());
+
+    QDateTime captured =
+            QDateTime::fromString(session.value("timestamp").toString(), Qt::ISODateWithMs);
+    if (captured.isValid())
+        captured = captured.toLocalTime();
+
+    ui->worldValueLabel->setText(world.value("name").toString());
+    ui->worldValueLabel->setToolTip(world.value("id").toString());
+    ui->instanceValueLabel->setText(world.value("instanceId").toString());
+    ui->authorValueLabel->setText(author.value("displayName").toString());
+    ui->authorValueLabel->setToolTip(author.value("id").toString());
+    ui->playersValueLabel->setText(players.isEmpty()
+                                           ? QString()
+                                           : tr("%1 (%2)").arg(QString::number(players.count()),
+                                                               players.join(", ")));
+    ui->playersValueLabel->setToolTip(players.join(", "));
+    ui->capturedValueLabel->setText(captured.isValid() ? captured.toString(locale.dateTimeFormat())
+                                                       : QString());
+
+    const QList<QPair<QLabel *, QLabel *>> sessionRows = {
+        { ui->worldLabel, ui->worldValueLabel },
+        { ui->instanceLabel, ui->instanceValueLabel },
+        { ui->authorLabel, ui->authorValueLabel },
+        { ui->playersLabel, ui->playersValueLabel },
+        { ui->capturedLabel, ui->capturedValueLabel },
+    };
+    for (const QPair<QLabel *, QLabel *> &row : sessionRows) {
+        const bool hasValue = !row.second->text().isEmpty();
+        row.first->setVisible(hasValue);
+        row.second->setVisible(hasValue);
+    }
+
     window()->adjustSize();
 }
