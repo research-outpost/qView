@@ -1,0 +1,91 @@
+name: Release builds
+
+# Fork build matrix: win64 (installer + portable), win64 arm64 (installer + portable),
+# linux AppImage, macOS bundle. 32-bit Windows is deliberately not built.
+# No NIGHTLY define, so the About dialog reports a plain version.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-2022
+            qtVersion: '6.8.3'
+            qtArch: win64_msvc2022_64
+            buildArch: X64
+            artifact: qView-Windows_64
+          - runner: windows-2022
+            qtVersion: '6.8.3'
+            qtArch: win64_msvc2022_arm64_cross_compiled
+            buildArch: Arm64
+            artifact: qView-Windows_arm64
+          - runner: ubuntu-22.04
+            qtVersion: '5.15.2'
+            artifact: qView-Linux
+          - runner: macos-15
+            qtVersion: '6.8.3'
+            qtModules: qtimageformats
+            buildArch: Universal
+            artifact: qView-macOS
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Set environment variables
+        shell: bash
+        run: |
+          echo "qtArch=${{ matrix.qtArch }}" >> $GITHUB_ENV
+          echo "buildArch=${{ matrix.buildArch }}" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v4
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ matrix.qtVersion }}
+          arch: ${{ matrix.qtArch }}
+          cache: true
+          modules: ${{ matrix.qtModules }}
+
+      - name: Build qView
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: dist/scripts/build.ps1 -CI
+
+      - name: Build qView
+        if: runner.os != 'Windows'
+        run: dist/scripts/build.sh
+
+      - name: Install Inno Setup
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: choco install innosetup --no-progress -y
+
+      # No NightlyVersion argument: windeployqt.ps1 then packages bin/ with
+      # dist/win/qView.iss and copies the setup .exe back into bin/.
+      - name: Deploy qView
+        shell: pwsh
+        if: runner.os == 'Windows'
+        run: |
+          & dist/scripts/download-plugins.ps1
+          & dist/scripts/windeployqt.ps1
+
+      - name: Deploy qView
+        shell: bash
+        if: runner.os == 'Linux'
+        run: bash dist/scripts/linuxdeployqt.sh
+
+      - name: Deploy qView
+        shell: bash
+        if: runner.os == 'macOS'
+        env:
+          APPLE_NOTARIZE_REQUESTED: 'false'
+        run: bash dist/scripts/macdeploy.sh
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: bin
