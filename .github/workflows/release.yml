@@ -26,11 +26,10 @@ jobs:
           - runner: ubuntu-22.04
             qtVersion: '5.15.2'
             artifact: qView-Linux
-          - runner: macos-15
-            qtVersion: '6.8.3'
-            qtModules: qtimageformats
-            buildArch: Universal
-            artifact: qView-macOS
+          # macOS is left out on purpose: on this fork macos-14 is refused outright
+          # ("configuration 'macos-14-arm64-us-default' is not supported") and
+          # macos-13/macos-15 stay queued with no runner, so a job would hang for
+          # hours. Add the leg back when a macOS runner is actually provisioned.
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Set environment variables
@@ -51,12 +50,7 @@ jobs:
 
       - name: Build qView
         shell: pwsh
-        if: runner.os == 'Windows'
         run: dist/scripts/build.ps1 -CI
-
-      - name: Build qView
-        if: runner.os != 'Windows'
-        run: dist/scripts/build.sh
 
       - name: Install Inno Setup
         shell: pwsh
