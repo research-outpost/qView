@@ -19,9 +19,9 @@ AppSupportURL={#MyAppURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={autopf}\qView-VRC
 LicenseFile=../../LICENSE
-#if "MyArch" == "x86"
+#if MyArch == "x86"
 OutputBaseFilename=qView-{#MyAppVersion}-win32
-#elif "MyArch" == "arm64"
+#elif MyArch == "arm64"
 OutputBaseFilename=qView-{#MyAppVersion}-winarm64
 #else
 OutputBaseFilename=qView-{#MyAppVersion}-win64
@@ -39,9 +39,9 @@ ChangesAssociations=yes
 Compression=lzma
 SolidCompression=yes
 PrivilegesRequiredOverridesAllowed=dialog
-#if "MyArch" == "x86"
+#if MyArch == "x86"
 ArchitecturesAllowed=x86
-#elif "MyArch" == "arm64"
+#elif MyArch == "arm64"
 ArchitecturesInstallIn64BitMode=arm64
 ArchitecturesAllowed=arm64
 #else
@@ -58,9 +58,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "fileassociation"; Description: "Create file associations"; GroupDescription: "Other:"; Flags: unchecked
 
 [Files]
-#if "MyArch" == "x86"
+#if MyArch == "x86"
 Source: "qView-Win32/*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
-#elif "MyArch" == "arm64"
+#elif MyArch == "arm64"
 Source: "qView-WinArm64/*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 #else
 Source: "qView-Win64/*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
