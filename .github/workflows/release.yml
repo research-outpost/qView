@@ -21,7 +21,9 @@ jobs:
           - runner: windows-2022
             qtVersion: '6.8.3'
             qtArch: win64_msvc2022_arm64_cross_compiled
-            buildArch: Arm64
+            # lowercase on purpose: dist/scripts/innomake.ps1 compares buildArch
+            # to 'arm64' to pass /dMyArch=arm64 to iscc
+            buildArch: arm64
             artifact: qView-Windows_arm64
           - runner: ubuntu-22.04
             qtVersion: '5.15.2'
