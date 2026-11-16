@@ -30,6 +30,7 @@ jobs:
         shell: pwsh
         env:
           buildArch: x64
+          qtArch: win64_msvc2022_64
         run: |
           & dist/scripts/download-plugins.ps1
           & dist/scripts/windeployqt.ps1
